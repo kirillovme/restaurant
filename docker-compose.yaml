@@ -17,6 +17,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
   db:
     image: postgres:15.1-alpine
     expose:
@@ -57,3 +60,7 @@ services:
       timeout: 30s
       retries: 5
       start_period: 80s
+  redis:
+    image: redis:latest
+    healthcheck:
+      test: [ "CMD", "redis-cli","ping" ]
