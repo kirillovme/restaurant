@@ -1,13 +1,14 @@
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from fastapi import Depends, status, HTTPException
-from app.database.database import get_db
+
 from app.api.models import models
-from app.api.schemas import schemas
 from app.api.repositories.submenu_repository import SubmenuRepository
+from app.api.schemas import schemas
+from app.database.database import get_db
 
 
 class DishRepository:
-    def __init__(self, session: Session = Depends(get_db)):
+    def __init__(self, session: Session = Depends(get_db)) -> None:
         self.session = session
         self.model = models.Dish
         self.submenu_rep = SubmenuRepository(session)
@@ -43,7 +44,7 @@ class DishRepository:
             ).first()
         )
         if not dish:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="dish not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='dish not found')
 
         return dish
 
@@ -59,7 +60,7 @@ class DishRepository:
             ).first()
         )
         if not dish_fromdb:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="dish not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='dish not found')
 
         for key, value in dish_data.model_dump(exclude_unset=True).items():
             setattr(dish_fromdb, key, value)
@@ -69,7 +70,7 @@ class DishRepository:
 
         return dish_fromdb
 
-    def delete_dish(self, menu_id: int, submenu_id: int, dish_id: int):
+    def delete_dish(self, menu_id: int, submenu_id: int, dish_id: int) -> None:
         dish = (
             self.session.query(models.Dish)
             .join(models.Submenu)
@@ -81,7 +82,7 @@ class DishRepository:
             ).first()
         )
         if not dish:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="dish not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='dish not found')
 
         self.session.delete(dish)
         self.session.commit()

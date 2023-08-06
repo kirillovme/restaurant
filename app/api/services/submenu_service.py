@@ -1,14 +1,16 @@
-from app.api.repositories.submenu_repository import SubmenuRepository
-from fastapi import Depends, status
-from app.api.schemas import schemas
-from fastapi.responses import JSONResponse
-from app.redis.submenu_redis import SubmenuRedis
-from app.redis.menu_redis import MenuRedis
 import pickle
+
+from fastapi import Depends, status
+from fastapi.responses import JSONResponse
+
+from app.api.repositories.submenu_repository import SubmenuRepository
+from app.api.schemas import schemas
+from app.redis.menu_redis import MenuRedis
+from app.redis.submenu_redis import SubmenuRedis
 
 
 class SubmenuService:
-    def __init__(self, submenu_repository: SubmenuRepository = Depends()):
+    def __init__(self, submenu_repository: SubmenuRepository = Depends()) -> None:
         self.submenu_repository = submenu_repository
 
     def get_items(self, menu_id: int) -> list[dict]:
@@ -19,10 +21,10 @@ class SubmenuService:
         result = []
         for submenu in submenus:
             temp = {
-                "id": str(submenu.id),
-                "title": submenu.title,
-                "description": submenu.description,
-                "dishes_count": self.submenu_repository.count_dishes(submenu.id)
+                'id': str(submenu.id),
+                'title': submenu.title,
+                'description': submenu.description,
+                'dishes_count': self.submenu_repository.count_dishes(submenu.id)
             }
             result.append(temp)
         SubmenuRedis.set_submenus(menu_id, pickle.dumps(result))
@@ -34,8 +36,8 @@ class SubmenuService:
         MenuRedis.delete_menu(menu_id)
         SubmenuRedis.delete_submenus(menu_id)
         return JSONResponse(status_code=status.HTTP_201_CREATED,
-                            content={"id": str(new_submenu.id), "title": new_submenu.title,
-                                     "description": new_submenu.description})
+                            content={'id': str(new_submenu.id), 'title': new_submenu.title,
+                                     'description': new_submenu.description})
 
     def get_item(self, menu_id: int, submenu_id: int) -> JSONResponse:
         submenu_redis = SubmenuRedis.get_submenu(menu_id, submenu_id)
@@ -45,19 +47,19 @@ class SubmenuService:
             submenu = self.submenu_repository.get_submenu(menu_id, submenu_id)
             SubmenuRedis.set_submenu(menu_id, submenu_id, pickle.dumps(submenu))
         return JSONResponse(status_code=status.HTTP_200_OK,
-                            content={"id": str(submenu.id),
-                                     "title": submenu.title,
-                                     "description": submenu.description,
-                                     "dishes_count": self.submenu_repository.count_dishes(submenu.id)})
+                            content={'id': str(submenu.id),
+                                     'title': submenu.title,
+                                     'description': submenu.description,
+                                     'dishes_count': self.submenu_repository.count_dishes(submenu.id)})
 
     def update_item(self, menu_id: int, submenu_id: int, submenu_data: schemas.Submenu) -> JSONResponse:
         submenu_fromdb = self.submenu_repository.update_submenu(menu_id, submenu_id, submenu_data)
         SubmenuRedis.clear_submenu_data(menu_id, submenu_id)
         return JSONResponse(status_code=status.HTTP_200_OK,
-                            content={"id": str(submenu_fromdb.id),
-                                     "title": submenu_fromdb.title,
-                                     "description": submenu_fromdb.description,
-                                     "dishes_count": self.submenu_repository.count_dishes(submenu_fromdb.id)})
+                            content={'id': str(submenu_fromdb.id),
+                                     'title': submenu_fromdb.title,
+                                     'description': submenu_fromdb.description,
+                                     'dishes_count': self.submenu_repository.count_dishes(submenu_fromdb.id)})
 
     def delete_item(self, menu_id: int, submenu_id: int) -> JSONResponse:
         self.submenu_repository.delete_submenu(menu_id, submenu_id)

@@ -1,12 +1,13 @@
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from fastapi import Depends, status, HTTPException
-from app.database.database import get_db
+
 from app.api.models import models
 from app.api.schemas import schemas
+from app.database.database import get_db
 
 
 class MenuRepository:
-    def __init__(self, session: Session = Depends(get_db)):
+    def __init__(self, session: Session = Depends(get_db)) -> None:
         self.session = session
         self.model = models.Menu
 
@@ -24,7 +25,7 @@ class MenuRepository:
     def get_menu(self, menu_id: int) -> models.Menu:
         menu = self.session.query(models.Menu).filter(models.Menu.id == menu_id).first()
         if not menu:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="menu not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='menu not found')
         return menu
 
     def update_menu(self, menu_id: int, menu_data: schemas.Menu) -> models.Menu:
@@ -36,7 +37,7 @@ class MenuRepository:
         self.session.refresh(menu_fromdb)
         return menu_fromdb
 
-    def delete_menu(self, menu_id: int):
+    def delete_menu(self, menu_id: int) -> None:
         menu_fromdb = self.get_menu(menu_id)
 
         self.session.delete(menu_fromdb)

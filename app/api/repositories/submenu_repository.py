@@ -1,13 +1,14 @@
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from fastapi import Depends, status, HTTPException
-from app.database.database import get_db
+
 from app.api.models import models
-from app.api.schemas import schemas
 from app.api.repositories.menu_repository import MenuRepository
+from app.api.schemas import schemas
+from app.database.database import get_db
 
 
 class SubmenuRepository:
-    def __init__(self, session: Session = Depends(get_db)):
+    def __init__(self, session: Session = Depends(get_db)) -> None:
         self.session = session
         self.model = models.Submenu
         self.menu_rep = MenuRepository(session)
@@ -28,7 +29,7 @@ class SubmenuRepository:
         submenu = self.session.query(models.Submenu).filter(models.Submenu.id == submenu_id,
                                                             models.Submenu.menu_id == menu_id).first()
         if not submenu:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="submenu not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='submenu not found')
 
         return submenu
 
@@ -36,7 +37,7 @@ class SubmenuRepository:
         submenu_fromdb = self.session.query(models.Submenu).filter(models.Submenu.id == submenu_id,
                                                                    models.Submenu.menu_id == menu_id).first()
         if not submenu_fromdb:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="submenu not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='submenu not found')
 
         for key, value in submenu_data.model_dump(exclude_unset=True).items():
             setattr(submenu_fromdb, key, value)
@@ -44,11 +45,11 @@ class SubmenuRepository:
         self.session.refresh(submenu_fromdb)
         return submenu_fromdb
 
-    def delete_submenu(self, menu_id: int, submenu_id: int):
+    def delete_submenu(self, menu_id: int, submenu_id: int) -> None:
         submenu_fromdb = self.session.query(models.Submenu).filter(models.Submenu.id == submenu_id,
                                                                    models.Submenu.menu_id == menu_id).first()
         if not submenu_fromdb:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="submenu not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='submenu not found')
 
         self.session.delete(submenu_fromdb)
         self.session.commit()

@@ -1,14 +1,16 @@
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from starlette import status
 
-from config import DB_PORT_TEST, DB_USER_TEST, DB_HOST_TEST, DB_NAME_TEST, DB_PASS_TEST
+from app.util.reverse import reverse
+from config import DB_HOST_TEST, DB_NAME_TEST, DB_PASS_TEST, DB_PORT_TEST, DB_USER_TEST
+
 from ...database.database import Base, get_db
 from ...main import app
-from fastapi.testclient import TestClient
 
-DATABASE_URL = f"postgresql://{DB_USER_TEST}:{DB_PASS_TEST}@{DB_HOST_TEST}:{DB_PORT_TEST}/{DB_NAME_TEST}"
+DATABASE_URL = f'postgresql://{DB_USER_TEST}:{DB_PASS_TEST}@{DB_HOST_TEST}:{DB_PORT_TEST}/{DB_NAME_TEST}'
 
 engine = create_engine(DATABASE_URL)
 
@@ -25,7 +27,7 @@ def override_get_db():
         db.close()
 
 
-def db_cleanup():
+def db_cleanup() -> None:
     engine_clean = create_engine(DATABASE_URL)
 
     Base.metadata.create_all(engine_clean)
@@ -45,33 +47,31 @@ def db_cleanup():
 
 app.dependency_overrides[get_db] = override_get_db
 
+
 @pytest.fixture
-def client():
+def client() -> TestClient:
     return TestClient(app)
 
 
 @pytest.fixture
-def create_menu(client):
+def create_menu(client: TestClient) -> dict:
     menu_data = {'title': 'Тестовое меню', 'description': 'Тестовое описание'}
-    response = client.post("/api/v1/menus", json=menu_data)
+    response = client.post(reverse('create_menu'), json=menu_data)
     assert response.status_code == status.HTTP_201_CREATED
     return response.json()
 
 
 @pytest.fixture
-def create_submenu(client, create_menu):
+def create_submenu(client: TestClient, create_menu: dict) -> dict:
     submenu_data = {'title': 'Тестовое подменю', 'description': 'Тестовое подменю'}
-    response = client.post(f"/api/v1/menus/{create_menu['id']}/submenus", json=submenu_data)
+    response = client.post(reverse('create_submenu', menu_id=create_menu['id']), json=submenu_data)
     assert response.status_code == status.HTTP_201_CREATED
     return response.json()
 
 
 @pytest.fixture
-def create_dish(client, create_menu, create_submenu):
+def create_dish(client: TestClient, create_menu: dict, create_submenu: dict) -> dict:
     dish_data = {'title': 'Тестовое блюдо', 'description': 'Тестовое описание блюда', 'price': 12.50}
     response = client.post(f"/api/v1/menus/{create_menu['id']}/submenus/{create_submenu['id']}/dishes", json=dish_data)
     assert response.status_code == status.HTTP_201_CREATED
     return response.json()
-
-
-
