@@ -34,32 +34,6 @@ services:
       timeout: 30s
       retries: 5
       start_period: 80s
-  test:
-    build:
-      context: .
-    env_file:
-      - .env
-    container_name: fastapi_tests
-    entrypoint: sh -c "alembic -c alembic.ini.testing upgrade head
-      && pytest"
-    depends_on:
-      test_db:
-        condition: service_healthy
-  test_db:
-    image: postgres:15.1-alpine
-    command: -p 6000
-    expose:
-      - 6000
-    env_file:
-      - .env
-    environment:
-      POSTGRES_DB: ${DB_NAME_TEST}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d restaurant_test -p 6000"]
-      interval: 10s
-      timeout: 30s
-      retries: 5
-      start_period: 80s
   redis:
     image: redis:latest
     healthcheck:
