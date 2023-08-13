@@ -65,3 +65,7 @@ Answer: app/api/endpoints
 3) ** Реализовать в тестах аналог Django reverse() для FastAP
 
 Answer: app/util/reverse.py
+
+4) Обновление меню из google sheets раз в 15 сек.
+
+Answer: app/tasks/celery_worker.py:40
