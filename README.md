@@ -47,6 +47,8 @@ This is a project of resturant app made during Ylab.
 
 ### Run with Celery+RabbitMQ
 The tests will run right after the start of the project
+
+!!!BEFORE THIS YOU SHOULD DOCKER DOWN ALL PREVIOUS CONTAINERS
 1) docker-compose -f docker-compose-celery.yaml up -d
 
 
