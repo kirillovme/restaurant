@@ -43,3 +43,17 @@ class Dish(DishBase):
 class DishResponse(DishBase):
     id: str
     price: str
+
+
+class DishDetailedResponse(DishResponse):
+    pass
+
+
+class SubmenuDetailedResponse(Submenu):
+    id: str
+    dishes: list[DishDetailedResponse]
+
+
+class MenuDetailedResponse(Menu):
+    id: str
+    submenus: list[SubmenuDetailedResponse]

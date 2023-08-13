@@ -1,88 +1,68 @@
 from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from app.api.models import models
+from app.api.repositories.base_repository import BaseRepository
 from app.api.repositories.submenu_repository import SubmenuRepository
 from app.api.schemas import schemas
 from app.database.database import get_db
 
 
-class DishRepository:
-    def __init__(self, session: Session = Depends(get_db)) -> None:
-        self.session = session
+class DishRepository(BaseRepository):
+    def __init__(self, session: AsyncSession = Depends(get_db)) -> None:
+        super().__init__(session)
         self.model = models.Dish
         self.submenu_rep = SubmenuRepository(session)
 
-    def get_dishes(self, menu_id: int, submenu_id: int) -> list[models.Dish]:
-        submenu = self.session.query(models.Submenu).filter(models.Submenu.id == submenu_id,
-                                                            models.Submenu.menu_id == menu_id).first()
+    async def get_dishes(self, menu_id: int, submenu_id: int) -> list[models.Dish]:
+        result = await self.session.execute(
+            select(models.Submenu).
+            where(models.Submenu.id == submenu_id, models.Submenu.menu_id == menu_id)
+        )
+        submenu = result.scalars().first()
         if not submenu:
             return []
 
         return submenu.dishes
 
-    def create_dish(self, menu_id: int, submenu_id: int, dish_data: schemas.Dish) -> models.Dish:
-        submenu = self.submenu_rep.get_submenu(menu_id, submenu_id)
+    async def create_dish(self, menu_id: int, submenu_id: int, dish_data: schemas.Dish) -> models.Dish:
+        submenu = await self.submenu_rep.get_submenu(menu_id, submenu_id)
         new_dish = models.Dish(title=dish_data.title,
                                description=dish_data.description,
                                price=dish_data.price,
                                submenu_id=submenu.id)
-        self.session.add(new_dish)
-        self.session.commit()
-        self.session.refresh(new_dish)
+        await self.db_add(new_dish)
         return new_dish
 
-    def get_dish(self, menu_id: int, submenu_id: int, dish_id: int) -> models.Dish:
-        dish = (
-            self.session.query(models.Dish)
+    async def get_dish(self, menu_id: int, submenu_id: int, dish_id: int) -> models.Dish:
+        result = await self.session.execute(
+            select(self.model)
             .join(models.Submenu)
             .join(models.Menu)
             .filter(
                 models.Dish.id == dish_id,
                 models.Submenu.id == submenu_id,
                 models.Menu.id == menu_id
-            ).first()
+            )
         )
+
+        dish = result.scalars().first()
         if not dish:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='dish not found')
 
         return dish
 
-    def update_dish(self, menu_id: int, submenu_id: int, dish_id: int, dish_data: schemas.Dish) -> models.Dish:
-        dish_fromdb = (
-            self.session.query(models.Dish)
-            .join(models.Submenu)
-            .join(models.Menu)
-            .filter(
-                models.Dish.id == dish_id,
-                models.Submenu.id == submenu_id,
-                models.Menu.id == menu_id
-            ).first()
-        )
-        if not dish_fromdb:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='dish not found')
+    async def update_dish(self, menu_id: int, submenu_id: int, dish_id: int, dish_data: schemas.Dish) -> models.Dish:
+        dish = await self.get_dish(menu_id, submenu_id, dish_id)
 
-        for key, value in dish_data.model_dump(exclude_unset=True).items():
-            setattr(dish_fromdb, key, value)
+        for key, value in dish_data.dict(exclude_unset=True).items():
+            setattr(dish, key, value)
 
-        self.session.commit()
-        self.session.refresh(dish_fromdb)
+        await self.db_update(dish)
 
-        return dish_fromdb
+        return dish
 
-    def delete_dish(self, menu_id: int, submenu_id: int, dish_id: int) -> None:
-        dish = (
-            self.session.query(models.Dish)
-            .join(models.Submenu)
-            .join(models.Menu)
-            .filter(
-                models.Dish.id == dish_id,
-                models.Submenu.id == submenu_id,
-                models.Menu.id == menu_id
-            ).first()
-        )
-        if not dish:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='dish not found')
-
-        self.session.delete(dish)
-        self.session.commit()
+    async def delete_dish(self, menu_id: int, submenu_id: int, dish_id: int) -> None:
+        dish = await self.get_dish(menu_id, submenu_id, dish_id)
+        await self.db_delete(dish)

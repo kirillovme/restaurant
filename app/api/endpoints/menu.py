@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 
 from app.api.schemas import schemas
@@ -13,8 +13,18 @@ router = APIRouter()
             tags=['Menus'],
             response_model=list[schemas.MenuResponse],
             name='get_menus')
-def get_menus(menu_service: MenuService = Depends()) -> list[dict]:
-    return menu_service.get_items()
+async def get_menus(menu_service: MenuService = Depends()) -> list[dict]:
+    return await menu_service.get_items()
+
+
+@router.get('/menus/details',
+            summary='Fetches a list of all menus in detail',
+            description='Return a list of all avaliable menus with submenus with dishes',
+            tags=['Menus'],
+            response_model=list[schemas.MenuDetailedResponse],
+            name='get_menus_details')
+async def get_menus_details(menu_service: MenuService = Depends()) -> list[dict]:
+    return await menu_service.get_items_details()
 
 
 @router.post('/menus',
@@ -23,8 +33,9 @@ def get_menus(menu_service: MenuService = Depends()) -> list[dict]:
              tags=['Menus'],
              response_model=schemas.MenuResponse,
              name='create_menu')
-def create_menu(menu_data: schemas.Menu, menu_service: MenuService = Depends()) -> JSONResponse:
-    return menu_service.create(menu_data)
+async def create_menu(menu_data: schemas.Menu, background_tasks: BackgroundTasks,
+                      menu_service: MenuService = Depends()) -> JSONResponse:
+    return await menu_service.create(menu_data, background_tasks)
 
 
 @router.get('/menus/{menu_id}', summary='Retrieves a specific menu by its ID',
@@ -32,8 +43,8 @@ def create_menu(menu_data: schemas.Menu, menu_service: MenuService = Depends()) 
             tags=['Menus'],
             response_model=schemas.MenuResponse,
             name='get_menu')
-def get_menu(menu_id: int, menu_service: MenuService = Depends()) -> JSONResponse:
-    return menu_service.get_item(menu_id)
+async def get_menu(menu_id: int, menu_service: MenuService = Depends()) -> JSONResponse:
+    return await menu_service.get_item(menu_id)
 
 
 @router.patch('/menus/{menu_id}', summary='Updates a specific menu by its ID',
@@ -41,8 +52,9 @@ def get_menu(menu_id: int, menu_service: MenuService = Depends()) -> JSONRespons
               tags=['Menus'],
               response_model=schemas.MenuResponse,
               name='update_menu')
-def update_menu(menu_id: int, menu_data: schemas.Menu, menu_service: MenuService = Depends()) -> JSONResponse:
-    return menu_service.update_item(menu_id, menu_data)
+async def update_menu(menu_id: int, menu_data: schemas.Menu, background_tasks: BackgroundTasks,
+                      menu_service: MenuService = Depends()) -> JSONResponse:
+    return await menu_service.update_item(menu_id, menu_data, background_tasks)
 
 
 @router.delete('/menus/{menu_id}', summary='Deletes a specific menu by its ID',
@@ -50,5 +62,6 @@ def update_menu(menu_id: int, menu_data: schemas.Menu, menu_service: MenuService
                tags=['Menus'],
                response_model=schemas.MenuResponse,
                name='delete_menu')
-def delete_menu(menu_id: int, menu_service: MenuService = Depends()) -> JSONResponse:
-    return menu_service.delete_item(menu_id)
+async def delete_menu(menu_id: int, background_tasks: BackgroundTasks,
+                      menu_service: MenuService = Depends()) -> JSONResponse:
+    return await menu_service.delete_item(menu_id, background_tasks)

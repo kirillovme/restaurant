@@ -1,77 +1,111 @@
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from starlette import status
+from __future__ import annotations
 
-from app.util.reverse import reverse
+import asyncio
+from typing import AsyncGenerator, Generator
+
+import pytest
+from httpx import AsyncClient
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+from sqlmodel import SQLModel
+
+from app.api.models.models import Dish, Menu, Submenu
+from app.database.database import get_db
+from app.main import app
+from app.redis.redis_client import redis_client
 from config import DB_HOST_TEST, DB_NAME_TEST, DB_PASS_TEST, DB_PORT_TEST, DB_USER_TEST
 
-from ...database.database import Base, get_db
-from ...main import app
+from .tests_data import dish_data, menu_data, submenu_data
 
-DATABASE_URL = f'postgresql://{DB_USER_TEST}:{DB_PASS_TEST}@{DB_HOST_TEST}:{DB_PORT_TEST}/{DB_NAME_TEST}'
+DATABASE_URL = f'postgresql+asyncpg://{DB_USER_TEST}:{DB_PASS_TEST}@{DB_HOST_TEST}:{DB_PORT_TEST}/{DB_NAME_TEST}'
 
-engine = create_engine(DATABASE_URL)
-
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base.metadata.create_all(bind=engine)
+test_engine = create_async_engine(DATABASE_URL)
+async_session_maker = sessionmaker(bind=test_engine, class_=AsyncSession)
+SQLModel.metadata.bind = test_engine
 
 
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def db_cleanup() -> None:
-    engine_clean = create_engine(DATABASE_URL)
-
-    Base.metadata.create_all(engine_clean)
-
-    cleaningSession = sessionmaker(autocommit=False, autoflush=False, bind=engine_clean)
-
-    session = cleaningSession()
-
-    try:
-        for table in reversed(Base.metadata.sorted_tables):
-            session.query(table).delete()
-
-        session.commit()
-    finally:
-        session.close()
+async def override_get_db() -> AsyncGenerator:
+    async with async_session_maker() as session:
+        yield session
 
 
 app.dependency_overrides[get_db] = override_get_db
 
 
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
+@pytest.fixture(autouse=True, scope='session')
+async def prepare_database() -> AsyncGenerator:
+    async with test_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    yield
+    async with test_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
 
 
-@pytest.fixture
-def create_menu(client: TestClient) -> dict:
-    menu_data = {'title': 'Тестовое меню', 'description': 'Тестовое описание'}
-    response = client.post(reverse('create_menu'), json=menu_data)
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()
+@pytest.fixture(autouse=True, scope='session')
+async def prepare_redis():
+    await redis_client.setup()
 
 
-@pytest.fixture
-def create_submenu(client: TestClient, create_menu: dict) -> dict:
-    submenu_data = {'title': 'Тестовое подменю', 'description': 'Тестовое подменю'}
-    response = client.post(reverse('create_submenu', menu_id=create_menu['id']), json=submenu_data)
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()
+@pytest.fixture(scope='session')
+def event_loop(request) -> Generator:
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
 
 
-@pytest.fixture
-def create_dish(client: TestClient, create_menu: dict, create_submenu: dict) -> dict:
-    dish_data = {'title': 'Тестовое блюдо', 'description': 'Тестовое описание блюда', 'price': 12.50}
-    response = client.post(f"/api/v1/menus/{create_menu['id']}/submenus/{create_submenu['id']}/dishes", json=dish_data)
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()
+@pytest.fixture(scope='session')
+async def session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
+
+
+@pytest.fixture(scope='session')
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    async with AsyncClient(app=app, base_url='http://test') as ac:
+        yield ac
+
+
+async def db_cleanup(session: AsyncSession) -> None:
+    """
+    Clean up the database by deleting all data in the tables.
+    This function does not delete the tables themselves.
+    """
+    # Delete all dishes
+    await session.execute(delete(Dish))
+    await session.commit()
+
+    # Delete all submenus
+    await session.execute(delete(Submenu))
+    await session.commit()
+
+    # Delete all menus
+    await session.execute(delete(Menu))
+    await session.commit()
+
+
+@pytest.fixture()
+async def create_menu(session: AsyncSession) -> AsyncGenerator[SQLModel, None]:
+    new_menu = Menu(**menu_data)
+    session.add(new_menu)
+    await session.commit()
+    await session.refresh(new_menu)
+    yield new_menu
+
+
+@pytest.fixture()
+async def create_submenu(create_menu: Menu, session: AsyncSession) -> AsyncGenerator[SQLModel, None]:
+    new_submenu = Submenu(**submenu_data, menu_id=create_menu.id)
+    session.add(new_submenu)
+    await session.commit()
+    await session.refresh(new_submenu)
+    yield new_submenu
+
+
+@pytest.fixture()
+async def create_dish(create_submenu: Submenu, session: AsyncSession) -> AsyncGenerator[SQLModel, None]:
+    new_dish = Dish(**dish_data, submenu_id=create_submenu.id)
+    session.add(new_dish)
+    await session.commit()
+    await session.refresh(new_dish)
+    yield new_dish

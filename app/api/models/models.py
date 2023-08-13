@@ -11,7 +11,10 @@ class Menu(Base):
     title = Column(String)
     description = Column(String)
 
-    submenus = relationship('Submenu', cascade='all, delete', back_populates='menu')
+    submenus = relationship('Submenu',
+                            cascade='all, delete',
+                            back_populates='menu',
+                            lazy='selectin')
 
 
 class Submenu(Base):
@@ -22,8 +25,13 @@ class Submenu(Base):
     title = Column(String)
     description = Column(String)
 
-    menu = relationship('Menu', back_populates='submenus')
-    dishes = relationship('Dish', cascade='all, delete', back_populates='submenu')
+    menu = relationship('Menu',
+                        back_populates='submenus',
+                        lazy='selectin')
+    dishes = relationship('Dish',
+                          cascade='all, delete',
+                          back_populates='submenu',
+                          lazy='selectin')
 
 
 class Dish(Base):
@@ -35,4 +43,6 @@ class Dish(Base):
     description = Column(String)
     price = Column(Numeric(10, 2))
 
-    submenu = relationship('Submenu', back_populates='dishes')
+    submenu = relationship('Submenu',
+                           back_populates='dishes',
+                           lazy='selectin')

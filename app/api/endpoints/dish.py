@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 
 from app.api.schemas import schemas
@@ -13,8 +13,8 @@ router = APIRouter()
             tags=['Dishes'],
             response_model=list[schemas.DishResponse],
             name='get_dishes')
-def get_dishes(menu_id: int, submenu_id: int, dish_service: DishService = Depends()) -> JSONResponse:
-    return dish_service.get_items(menu_id, submenu_id)
+async def get_dishes(menu_id: int, submenu_id: int, dish_service: DishService = Depends()) -> list[dict]:
+    return await dish_service.get_items(menu_id, submenu_id)
 
 
 @router.post('/dishes',
@@ -23,11 +23,12 @@ def get_dishes(menu_id: int, submenu_id: int, dish_service: DishService = Depend
              tags=['Dishes'],
              response_model=schemas.DishResponse,
              name='create_dish')
-def create_dish(menu_id: int,
-                submenu_id: int,
-                dish_data: schemas.Dish,
-                dish_service: DishService = Depends()) -> JSONResponse:
-    return dish_service.create_item(menu_id, submenu_id, dish_data)
+async def create_dish(menu_id: int,
+                      submenu_id: int,
+                      dish_data: schemas.Dish,
+                      background_tasks: BackgroundTasks,
+                      dish_service: DishService = Depends()) -> JSONResponse:
+    return await dish_service.create_item(menu_id, submenu_id, dish_data, background_tasks)
 
 
 @router.get('/dishes/{dish_id}',
@@ -36,8 +37,8 @@ def create_dish(menu_id: int,
             tags=['Dishes'],
             response_model=schemas.DishResponse,
             name='get_dish')
-def get_dish(menu_id: int, submenu_id: int, dish_id: int, dish_service: DishService = Depends()) -> JSONResponse:
-    return dish_service.get_item(menu_id, submenu_id, dish_id)
+async def get_dish(menu_id: int, submenu_id: int, dish_id: int, dish_service: DishService = Depends()) -> JSONResponse:
+    return await dish_service.get_item(menu_id, submenu_id, dish_id)
 
 
 @router.patch('/dishes/{dish_id}',
@@ -46,9 +47,10 @@ def get_dish(menu_id: int, submenu_id: int, dish_id: int, dish_service: DishServ
               tags=['Dishes'],
               response_model=schemas.DishResponse,
               name='update_dish')
-def update_dish(menu_id: int, submenu_id: int, dish_id: int, dish_data: schemas.Dish,
-                dish_service: DishService = Depends()) -> JSONResponse:
-    return dish_service.update_item(menu_id, submenu_id, dish_id, dish_data)
+async def update_dish(menu_id: int, submenu_id: int, dish_id: int, dish_data: schemas.Dish,
+                      background_tasks: BackgroundTasks,
+                      dish_service: DishService = Depends()) -> JSONResponse:
+    return await dish_service.update_item(menu_id, submenu_id, dish_id, dish_data, background_tasks)
 
 
 @router.delete('/dishes/{dish_id}',
@@ -57,5 +59,6 @@ def update_dish(menu_id: int, submenu_id: int, dish_id: int, dish_data: schemas.
                tags=['Dishes'],
                response_model=schemas.DishResponse,
                name='delete_dish')
-def delete_dish(menu_id: int, submenu_id: int, dish_id: int, dish_service: DishService = Depends()) -> JSONResponse:
-    return dish_service.delete_item(menu_id, submenu_id, dish_id)
+async def delete_dish(menu_id: int, submenu_id: int, dish_id: int, background_tasks: BackgroundTasks,
+                      dish_service: DishService = Depends()) -> JSONResponse:
+    return await dish_service.delete_item(menu_id, submenu_id, dish_id, background_tasks)
