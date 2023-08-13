@@ -37,7 +37,8 @@ def read_and_parse(filepath):
 def database_sync():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    menus, submenus, dishes = read_and_parse(file_path)
+    menus, submenus, dishes = read_and_parse('https://docs.google.com/spreadsheets/d'
+                                             '/1On2gNZyWVnUyvcvUljG6qv4xCqOZPIlRAoVlva58zGw/export?format=xlsx')
     loop.run_until_complete(async_database_operations(menus, submenus, dishes))
     loop.close()
 
