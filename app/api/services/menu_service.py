@@ -39,6 +39,9 @@ class MenuService:
         return result
 
     async def get_items_details(self) -> list[dict]:
+        menus_redis = await MenuRedis.get_menus_details()
+        if menus_redis:
+            return pickle.loads(menus_redis)
         menus = await self.menu_repository.get_menu_details()
         result = []
         for menu in menus:
@@ -59,6 +62,7 @@ class MenuService:
                 } for submenu in menu.submenus]
             }
             result.append(temp)
+        await MenuRedis.set_menus_details(pickle.dumps(result))
         return result
 
     async def get_item(self, menu_id: int) -> JSONResponse:

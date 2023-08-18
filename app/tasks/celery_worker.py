@@ -48,43 +48,60 @@ BASE_URL = 'http://app:8000/api/v1'
 
 async def async_database_operations(menus, submenus, dishes):
     async with AsyncClient() as client:
-        for menu in menus:
-            menu_id = menu['id']
-            response = await client.get(f'{BASE_URL}/menus/{menu_id}')
-            if response.status_code == 200:
-                menu_id = menu['id']
-                del menu['id']
-                await client.patch(f'{BASE_URL}/menus/{menu_id}', json=menu)
-            elif response.status_code == 404:
-                await client.post(f'{BASE_URL}/menus', json=menu)
-
+        # Fetch existing records
+        db_menus = await fetch_all_from_database(client, '/menus')
+        db_submenus = {menu_id: await fetch_all_from_database(client, f'/menus/{menu_id}/submenus') for menu_id in
+                       db_menus.keys()}
+        db_dishes = {}
         for submenu in submenus:
-            submenu_id = submenu['id']
-            menu_id = submenu['menu_id']
-            response = await client.get(f'{BASE_URL}/menus/{menu_id}/submenus/{submenu_id}')
+            submenu_id = str(submenu['id'])
+            menu_id = str(submenu['menu_id'])
+            endpoint = f'/menus/{menu_id}/submenus/{submenu_id}/dishes'
+            db_dishes[submenu_id] = await fetch_all_from_database(client, endpoint)
 
-            if response.status_code == 200:
-                del submenu['id']
-                del submenu['menu_id']
+        # Synchronize menus
+        for menu in menus:
+            menu_id = str(menu['id'])
+            if menu_id in db_menus:
+                del db_menus[menu_id]
+                await client.patch(f'{BASE_URL}/menus/{menu_id}', json=menu)
+            else:
+                await client.post(f'{BASE_URL}/menus', json=menu)
+        for menu_id in db_menus.keys():
+            await client.delete(f'{BASE_URL}/menus/{menu_id}')
+
+        # Synchronize submenus
+        for submenu in submenus:
+            submenu_id = str(submenu['id'])
+            menu_id = str(submenu['menu_id'])
+            if submenu_id in db_submenus.get(menu_id, {}):
+                del db_submenus[menu_id][submenu_id]
                 await client.patch(f'{BASE_URL}/menus/{menu_id}/submenus/{submenu_id}', json=submenu)
-            elif response.status_code == 404:
-                del submenu['menu_id']
-                del submenu['id']
+            else:
                 await client.post(f'{BASE_URL}/menus/{menu_id}/submenus', json=submenu)
+        for menu_id, submenu_dict in db_submenus.items():
+            for submenu_id in submenu_dict.keys():
+                await client.delete(f'{BASE_URL}/menus/{menu_id}/submenus/{submenu_id}')
 
+        # Synchronize dishes
         for dish in dishes:
-            dish_id = dish['id']
-            submenu_id = dish['submenu_id']
-            menu_id = dish['menu_id']
-            response = await client.get(f'{BASE_URL}/menus/{menu_id}/submenus/{submenu_id}/dishes/{dish_id}')
-
-            if response.status_code == 200:
-                del dish['id']
-                del dish['submenu_id']
-                del dish['menu_id']
-                await client.patch(f'{BASE_URL}/menus/{menu_id}/submenus/{submenu_id}/dishes/{dish_id}',
-                                   json=dish)
-            elif response.status_code == 404:
-                del dish['menu_id']
-                del dish['submenu_id']
+            dish_id = str(dish['id'])
+            submenu_id = str(dish['submenu_id'])
+            menu_id = str(dish['menu_id'])
+            if dish_id in db_dishes.get(submenu_id, {}):
+                del db_dishes[submenu_id][dish_id]
+                await client.patch(f'{BASE_URL}/menus/{menu_id}/submenus/{submenu_id}/dishes/{dish_id}', json=dish)
+            else:
                 await client.post(f'{BASE_URL}/menus/{menu_id}/submenus/{submenu_id}/dishes', json=dish)
+
+        for submenu_id, dishes_dict in db_dishes.items():
+            menu_id = next((submenu['menu_id'] for submenu in submenus if str(submenu['id']) == submenu_id), None)
+            for dish_id in dishes_dict.keys():
+                await client.delete(f'{BASE_URL}/menus/{menu_id}/submenus/{submenu_id}/dishes/{dish_id}')
+
+
+async def fetch_all_from_database(client, endpoint):
+    response = await client.get(f'{BASE_URL}{endpoint}')
+    if response.status_code == 200:
+        return {str(item['id']): item for item in response.json()}
+    return {}

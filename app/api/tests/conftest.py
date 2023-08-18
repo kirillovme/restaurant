@@ -13,6 +13,7 @@ from sqlmodel import SQLModel
 from app.api.models.models import Dish, Menu, Submenu
 from app.database.database import get_db
 from app.main import app
+from app.redis.menu_redis import MenuRedis
 from app.redis.redis_client import redis_client
 from config import DB_HOST_TEST, DB_NAME_TEST, DB_PASS_TEST, DB_PORT_TEST, DB_USER_TEST
 
@@ -88,6 +89,7 @@ async def db_cleanup(session: AsyncSession) -> None:
 async def create_menu(session: AsyncSession) -> AsyncGenerator[SQLModel, None]:
     new_menu = Menu(**menu_data)
     session.add(new_menu)
+    await MenuRedis.clear_menus_data()
     await session.commit()
     await session.refresh(new_menu)
     yield new_menu
@@ -97,6 +99,7 @@ async def create_menu(session: AsyncSession) -> AsyncGenerator[SQLModel, None]:
 async def create_submenu(create_menu: Menu, session: AsyncSession) -> AsyncGenerator[SQLModel, None]:
     new_submenu = Submenu(**submenu_data, menu_id=create_menu.id)
     session.add(new_submenu)
+    await MenuRedis.clear_menus_data()
     await session.commit()
     await session.refresh(new_submenu)
     yield new_submenu
@@ -106,6 +109,7 @@ async def create_submenu(create_menu: Menu, session: AsyncSession) -> AsyncGener
 async def create_dish(create_submenu: Submenu, session: AsyncSession) -> AsyncGenerator[SQLModel, None]:
     new_dish = Dish(**dish_data, submenu_id=create_submenu.id)
     session.add(new_dish)
+    await MenuRedis.clear_menus_data()
     await session.commit()
     await session.refresh(new_dish)
     yield new_dish
